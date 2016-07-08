@@ -1,7 +1,11 @@
 var loader = require("./lib/loader.js");
 
+var instance = null;
 module.exports = function(dir_path){
-	return new loader(dir_path, _getCallerFile());
+	if(instance == null) {
+		instance = new loader(dir_path, _getCallerFile());
+	}
+	return instance;
 }
 
 function _getCallerFile() {
