@@ -1,6 +1,6 @@
 {
   "name": "sql-loader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Simple sql file loader for nodejs",
   "main": "index.js",
   "scripts": {
@@ -26,8 +26,5 @@
   "bugs": {
     "url": "https://github.com/lostcode7/node-sql-loader/issues"
   },
-  "homepage": "https://github.com/lostcode7/node-sql-loader#readme",
-  "dependencies": {
-    "async": "^2.0.0-rc.6"
-  }
+  "homepage": "https://github.com/lostcode7/node-sql-loader#readme"
 }
