@@ -1,0 +1,33 @@
+{
+  "name": "sql-loader",
+  "version": "1.0.0",
+  "description": "Simple sql file loader for nodejs",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lostcode7/node-sql-loader.git"
+  },
+  "keywords": [
+    "sql",
+    "sqlloader",
+    "sqlLoader",
+    "sql-loader",
+    "loadSql",
+    "load sql",
+    "sql load",
+    "sql file load",
+    "sql manager"
+  ],
+  "author": "lostcode7",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lostcode7/node-sql-loader/issues"
+  },
+  "homepage": "https://github.com/lostcode7/node-sql-loader#readme",
+  "dependencies": {
+    "async": "^2.0.0-rc.6"
+  }
+}
