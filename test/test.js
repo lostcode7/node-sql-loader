@@ -1,4 +1,4 @@
-sqlLoad = require("./load/sqlLoad.js");
+var sqlLoad = require("./load/sqlLoad.js");
 
 console.log("--------Root Dir Tset---------");
 root_dir_sql = sqlLoad.root_dir_test();
