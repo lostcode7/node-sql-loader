@@ -3,13 +3,16 @@ import { parseArgs, styleText } from 'node:util';
 import type { Diagnostic } from '../index';
 import { checkSqlSync, SqlLoaderError } from '../index';
 
-const USAGE = 'Usage: sql-loader check <dir> [--generated <file>] [--json]';
+const USAGE = 'Usage: sql-loader check <dir> [--generated <file>] [--dialect postgres] [--json]';
 
 type GeneratedStatus = 'fresh' | 'stale' | 'unparseable';
 
-// Parses the `// sql-loader:generated v=1 hash=... files=...` header emitted by
-// `generate`. Text-only — the generated file is never imported or executed.
-function parseGeneratedHeader(text: string): { v: string; hash: string } | null {
+// Parses the `// sql-loader:generated v=1 hash=... files=... [dialect=...]`
+// header emitted by `generate`. Text-only — the generated file is never
+// imported or executed. Unknown fields are ignored (forward compatibility).
+function parseGeneratedHeader(
+  text: string,
+): { v: string; hash: string; dialect: string | null } | null {
   const lines = text.split(/\r?\n/, 20);
   for (const line of lines) {
     if (!/^\/\/ sql-loader:generated\b/.test(line)) continue;
@@ -20,7 +23,7 @@ function parseGeneratedHeader(text: string): { v: string; hash: string } | null 
     }
     const v = fields.v;
     const hash = fields.hash;
-    if (v !== undefined && hash !== undefined) return { v, hash };
+    if (v !== undefined && hash !== undefined) return { v, hash, dialect: fields.dialect ?? null };
     return null;
   }
   return null;
@@ -68,11 +71,13 @@ export function runCheck(argv: string[]): number {
   let dir: string;
   let generatedPath: string | undefined;
   let json: boolean;
+  let dialect: 'postgres' | undefined;
   try {
     const parsed = parseArgs({
       args: argv,
       options: {
         generated: { type: 'string' },
+        dialect: { type: 'string' },
         json: { type: 'boolean', default: false },
       },
       allowPositionals: true,
@@ -82,8 +87,12 @@ export function runCheck(argv: string[]): number {
     if (positional === undefined || parsed.positionals.length !== 1) {
       throw new Error('expected exactly one <dir> argument');
     }
+    if (parsed.values.dialect !== undefined && parsed.values.dialect !== 'postgres') {
+      throw new Error('--dialect must be "postgres"');
+    }
     dir = positional;
     generatedPath = parsed.values.generated;
+    dialect = parsed.values.dialect as 'postgres' | undefined;
     json = parsed.values.json ?? false;
   } catch (error) {
     console.error(`sql-loader check: ${error instanceof Error ? error.message : error}`);
@@ -93,7 +102,7 @@ export function runCheck(argv: string[]): number {
 
   let result: ReturnType<typeof checkSqlSync>;
   try {
-    result = checkSqlSync(dir);
+    result = checkSqlSync(dir, dialect === undefined ? undefined : { dialect });
   } catch (error) {
     if (SqlLoaderError.isSqlLoaderError(error)) {
       console.error(error.message);
@@ -120,9 +129,12 @@ export function runCheck(argv: string[]): number {
     if (header === null) {
       generated = { path: generatedPath, status: 'unparseable' };
     } else {
+      // A dialect-mode mismatch needs regeneration even when hashes agree
+      // (hashes always cover the original text, not the compiled artifacts).
+      const dialectMatches = header.dialect === (dialect ?? null);
       generated = {
         path: generatedPath,
-        status: header.hash === result.hash ? 'fresh' : 'stale',
+        status: header.hash === result.hash && dialectMatches ? 'fresh' : 'stale',
       };
     }
   }
@@ -135,6 +147,7 @@ export function runCheck(argv: string[]): number {
       JSON.stringify(
         {
           root: dir,
+          dialect: dialect ?? null,
           queries: result.entries.length,
           hash: result.hash,
           diagnostics: result.diagnostics,

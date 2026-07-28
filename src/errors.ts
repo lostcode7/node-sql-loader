@@ -7,7 +7,12 @@ export type SqlLoaderErrorCode =
   | 'ERR_EMPTY_SQL'
   | 'ERR_INVALID_NAME'
   | 'ERR_PRELUDE_CONTENT'
-  | 'ERR_WATCH_UNAVAILABLE';
+  | 'ERR_WATCH_UNAVAILABLE'
+  | 'ERR_PARAM_MIXED'
+  | 'ERR_PARAM_GAP'
+  | 'ERR_PARAM_SYNTAX'
+  | 'ERR_ANNOTATION'
+  | 'ERR_CARDINALITY';
 
 const ERROR_BRAND: unique symbol = Symbol.for('sql-loader.error') as never;
 

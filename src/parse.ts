@@ -4,6 +4,8 @@ import { SqlLoaderError } from './errors';
 export interface ParsedQuery {
   name: string | null;
   text: string;
+  /** 1-based line of the `-- name:` marker; null for whole-file queries. */
+  line: number | null;
 }
 
 /**
@@ -116,7 +118,7 @@ export function parseSqlFile(text: string, relativePath: string): ParsedQuery[] 
   }
 
   const first = markers[0];
-  if (first === undefined) return [{ name: null, text }];
+  if (first === undefined) return [{ name: null, text, line: null }];
 
   validatePrelude(lines.slice(0, first.line), relativePath);
 
@@ -144,7 +146,7 @@ export function parseSqlFile(text: string, relativePath: string): ParsedQuery[] 
           'Fix: add SQL under the marker or remove the marker.',
       );
     }
-    queries.push({ name, text: body.join('\n') });
+    queries.push({ name, text: body.join('\n'), line: marker.line + 1 });
   }
   return queries;
 }

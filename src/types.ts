@@ -1,15 +1,39 @@
+/** Supported dialect for parameter compilation (opt-in). */
+export type SqlDialect = 'postgres';
+
+/** Declared result-shape of a query (`-- @returns <value>` annotation). */
+export type SqlCardinality = 'zero-or-one' | 'exactly-one' | 'many' | 'none';
+
 /**
  * A single SQL query loaded from disk.
  */
 export interface SqlEntry {
   /** Query ID with `/` separators, e.g. `"users/findById"`. */
   id: string;
-  /** SQL text. UTF-8 BOM is stripped and CRLF is normalized to LF. */
+  /**
+   * ORIGINAL SQL text (`:name` style preserved). UTF-8 BOM is stripped and
+   * CRLF is normalized to LF. Never rewritten — `hash` and all catalog
+   * hashes are computed over this text regardless of dialect mode.
+   */
   text: string;
   /** Absolute path of the source `.sql` file. */
   filePath: string;
   /** Content hash of `text`, formatted as `sha256-<hex>`. */
   hash: string;
+  /** 1-based line of the `-- name:` marker (named queries only). */
+  line?: number;
+  /**
+   * Dialect-compiled text with named parameters rewritten to positional
+   * placeholders (`:id` → `$1`). Present only when `dialect` is set and the
+   * query uses named parameters.
+   */
+  compiledText?: string;
+  /** Named parameter names in placeholder order (dialect mode only). */
+  parameters?: string[];
+  /** Highest positional placeholder index used (`$n`-style queries). */
+  positionalCount?: number;
+  /** Cardinality declared via `-- @returns` (dialect mode only). */
+  cardinality?: SqlCardinality;
 }
 
 /**
@@ -54,6 +78,13 @@ export interface LoadOptions {
   followSymlinks?: boolean;
   /** File encoding used to read `.sql` files. Default: `'utf-8'`. */
   encoding?: BufferEncoding;
+  /**
+   * Opt-in parameter compilation. With `'postgres'`, `:name` parameters are
+   * lexed (string/comment/dollar-quote aware), validated, and compiled to
+   * `$n` placeholders on `SqlEntry.compiledText`; `-- @returns` annotations
+   * populate `cardinality`. Original `text` and every hash stay unchanged.
+   */
+  dialect?: SqlDialect;
 }
 
 /**

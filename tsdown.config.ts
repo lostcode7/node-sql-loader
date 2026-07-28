@@ -22,7 +22,12 @@ export default defineConfig([
   },
   {
     // Bundler plugins: dual, because bundler config files are CJS-heavy.
-    entry: { vite: 'src/vite.ts', rollup: 'src/rollup.ts', esbuild: 'src/esbuild.ts' },
+    entry: {
+      vite: 'src/vite.ts',
+      rollup: 'src/rollup.ts',
+      esbuild: 'src/esbuild.ts',
+      pg: 'src/pg.ts',
+    },
     format: ['esm', 'cjs'],
     dts: true,
     platform: 'node',

@@ -120,6 +120,37 @@ Notes:
 - In Vite, `?raw`/`?url`/`?inline` imports keep their normal asset semantics; editing a `.sql` file triggers a reload (the module intentionally doesn't hot-swap in place).
 - The ambient `*.sql` type is an approximation (default export typed as a string with string properties). For precise, per-query types use `sql-loader generate`.
 
+## PostgreSQL parameters & typed contracts (opt-in)
+
+With `dialect: 'postgres'` (API) or `--dialect postgres` (CLI), named parameters are lexed with full awareness of strings, comments, casts, and dollar quoting — then compiled to driver placeholders. Values are **never** interpolated into SQL.
+
+```sql
+-- name: findById
+-- @returns zero-or-one
+SELECT id, email FROM users WHERE id = :id;
+```
+
+```
+npx sql-loader generate ./sql --dialect postgres --out src/sql.generated.ts
+```
+
+The generated module gains `statements` (compiled `$n` text + parameter lists as literal tuples) and `SqlParamsOf` — missing or misspelled parameters become compile errors:
+
+```ts
+import { statements, type SqlParamsOf } from './sql.generated.js';
+import { createPgExecutor } from 'sql-loader/pg';
+
+const db = createPgExecutor(pool);                        // any pg-compatible client
+const user = await db.execute(statements['users/findById'], { id });   // params typed
+// user: Record<string, unknown> | null   ← from @returns zero-or-one
+```
+
+- `-- @returns zero-or-one | exactly-one | many | none` declares cardinality; the executor enforces it at runtime (`ERR_CARDINALITY`) and narrows the return type (`Row | null`, `Row`, `Row[]`, affected count).
+- Validation: mixed `:name`/`$n` styles (`ERR_PARAM_MIXED`), gaps like `$1,$3` (`ERR_PARAM_GAP`), `$0`/unterminated constructs/psql `:'var'` (`ERR_PARAM_SYNTAX`), bad annotations (`ERR_ANNOTATION`).
+- **Invariant:** original `text` and every hash never change — compiled text lives only in `statements` (and `SqlEntry.compiledText`), so `check --generated` freshness keeps working across modes.
+- `createPgExecutor(pool, { prepare: true })` opts into named prepared statements (hash-derived names; off by default — transaction-pooling PgBouncer < 1.21 breaks them).
+- Known lexical limits (documented, not bugs): `a[x:y]` slices lex `:y` as a parameter (prefer positional there); `?`/`?|`/`?&` jsonb operators are never parameters; result *column types* are out of scope — pair with PgTyped/sqlc if you need schema-derived row types.
+
 ## API
 
 | Function | Returns |
@@ -195,6 +226,7 @@ await db.query(sql.users.findById, [userId]);
 - `npx sql-loader check ./sql --generated src/sql.generated.ts` — CI에서 검증·재생성 필요 감지 (`--json` 지원)
 - `watchSql(dir)` — 개발 중 `.sql` 변경 자동 반영
 - **`.sql` 직접 import** — `sql-loader/vite`·`/rollup`·`/esbuild` 플러그인 또는 `node --import sql-loader/register`로 `.sql` 파일을 모듈처럼 import (`-- name:` 파일은 named export)
+- **PostgreSQL 파라미터 컴파일(opt-in)** — `--dialect postgres`로 `:name` → `$n` 컴파일 + 파라미터 누락이 컴파일 에러가 되는 `SqlParamsOf` 타입 생성, `-- @returns` 카디널리티 선언, `sql-loader/pg`의 얇은 실행기(`createPgExecutor`)로 런타임 강제
 - **v1에서 오신 분**: 모듈이 더 이상 함수가 아닙니다(`loadSqlSync(dir)` 사용). 상대경로는 이제 호출 파일이 아닌 `process.cwd()` 기준입니다 — 모듈 기준 경로는 `new URL('./sql/', import.meta.url)`을 쓰세요. 자세한 내용: [docs/MIGRATION.md](./docs/MIGRATION.md)
 
 ## License

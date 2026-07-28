@@ -1,3 +1,4 @@
+import { compilePostgresQuery } from './dialect';
 import { SqlLoaderError, type SqlLoaderErrorCode } from './errors';
 import { hashCatalog, hashText } from './hash';
 import { parseSqlFile } from './parse';
@@ -10,7 +11,8 @@ export type DiagnosticCode =
   | SqlLoaderErrorCode
   | 'WARN_BOM'
   | 'WARN_CASE_INSENSITIVE_DUPLICATE'
-  | 'WARN_UNREADABLE';
+  | 'WARN_UNREADABLE'
+  | 'WARN_UNKNOWN_ANNOTATION';
 
 export interface Diagnostic {
   severity: 'error' | 'warning';
@@ -20,6 +22,8 @@ export interface Diagnostic {
   file?: string;
   /** Query ID involved, if any. */
   id?: string;
+  /** 1-based line of the `-- name:` marker for named queries, if any. */
+  line?: number;
 }
 
 export interface AnalyzeResult {
@@ -107,11 +111,42 @@ export function analyze(
         if (options.onEmpty === 'error') continue;
       }
 
-      candidates.push({
-        segments,
-        relativePath: file.relativePath,
-        entry: { id, text: query.text, filePath: file.absolutePath, hash: hashText(query.text) },
-      });
+      const entry: SqlEntry = {
+        id,
+        text: query.text,
+        filePath: file.absolutePath,
+        hash: hashText(query.text),
+      };
+      if (query.line !== null) entry.line = query.line;
+
+      if (options.dialect === 'postgres') {
+        const context =
+          query.name === null ? file.relativePath : `${file.relativePath} (query "${query.name}")`;
+        const compiled = compilePostgresQuery(query.text, context);
+        let hasParamError = false;
+        for (const dialectDiagnostic of compiled.diagnostics) {
+          if (dialectDiagnostic.severity === 'error') hasParamError = true;
+          const diagnostic: Diagnostic = {
+            severity: dialectDiagnostic.severity,
+            code: dialectDiagnostic.code,
+            message: dialectDiagnostic.message,
+            file: file.relativePath,
+            id,
+          };
+          if (query.line !== null) diagnostic.line = query.line;
+          diagnostics.push(diagnostic);
+        }
+        if (!hasParamError) {
+          if (compiled.parameters.length > 0) {
+            entry.parameters = compiled.parameters;
+            entry.compiledText = compiled.compiledText;
+          }
+          if (compiled.positionalCount > 0) entry.positionalCount = compiled.positionalCount;
+          if (compiled.cardinality !== null) entry.cardinality = compiled.cardinality;
+        }
+      }
+
+      candidates.push({ segments, relativePath: file.relativePath, entry });
     }
   }
 

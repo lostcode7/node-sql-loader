@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { normalizeSqlText } from './parse';
 import { notADirectoryError, type ResolvedSource, sourceNotFoundError } from './resolve';
-import type { FilterInput, LoadOptions, OnEmpty } from './types';
+import type { FilterInput, LoadOptions, OnEmpty, SqlDialect } from './types';
 
 const SQL_EXTENSION = '.sql';
 
@@ -37,6 +37,7 @@ export interface ResolvedOptions {
   onEmpty: OnEmpty;
   followSymlinks: boolean;
   encoding: BufferEncoding;
+  dialect: SqlDialect | null;
 }
 
 export function resolveOptions(options: LoadOptions = {}): ResolvedOptions {
@@ -45,6 +46,7 @@ export function resolveOptions(options: LoadOptions = {}): ResolvedOptions {
     onEmpty: options.onEmpty ?? 'error',
     followSymlinks: options.followSymlinks ?? false,
     encoding: options.encoding ?? 'utf-8',
+    dialect: options.dialect ?? null,
   };
 }
 

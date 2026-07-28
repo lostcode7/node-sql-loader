@@ -90,8 +90,13 @@ All errors are `SqlLoaderError` with a `code`. Branch on `code`, not the message
 | ERR_INVALID_NAME | bad `-- name:` payload | use `-- name: someIdentifier`, nothing else on the line |
 | ERR_PRELUDE_CONTENT | SQL before the first `-- name:` marker | move it under a marker or remove it |
 | ERR_WATCH_UNAVAILABLE | fs.watch unsupported here | pass `{ poll: 1000 }` to watchSql |
+| ERR_PARAM_MIXED | `:name` and `$n` in one query (dialect mode) | use one parameter style per query |
+| ERR_PARAM_GAP | `$1,$3` skips indices (dialect mode) | number positional params consecutively from $1 |
+| ERR_PARAM_SYNTAX | lex failure: unterminated string/comment/dollar-quote, `$0`, psql `:'var'` | fix the SQL; pass values as parameters |
+| ERR_ANNOTATION | invalid/duplicate `-- @returns` value | use zero-or-one, exactly-one, many, or none, once |
+| ERR_CARDINALITY | runtime rows violated declared `@returns` (executor) | adjust the query, data, or annotation |
 
-Warning diagnostic codes (from `check`): `WARN_BOM`, `WARN_CASE_INSENSITIVE_DUPLICATE`, `WARN_UNREADABLE`.
+Warning diagnostic codes (from `check`): `WARN_BOM`, `WARN_CASE_INSENSITIVE_DUPLICATE`, `WARN_UNREADABLE`, `WARN_UNKNOWN_ANNOTATION`.
 
 ## CLI contract
 
@@ -166,6 +171,30 @@ watcher.on('error', console.error);            // REQUIRED: unhandled 'error' cr
 watcher.on('change', ({ snapshot, added, removed, changed }) => { /* swap snapshot.tree */ });
 await watcher[Symbol.asyncDispose]();          // or watcher.close()
 ```
+
+## Postgres dialect mode (v2.2+, opt-in)
+
+Enable with `{ dialect: 'postgres' }` (API) or `--dialect postgres` (CLI). Default behavior is completely unchanged without it.
+
+- Lexing is string/comment/dollar-quote/cast aware: `'... :no ...'`, `-- :no`, `/* :no */`, `$$ :no $$`, `:id::uuid` (cast), `:=`, `abc$1` (identifier), `?`/`?|`/`?&` (jsonb operators — NEVER parameters) are all handled correctly. Nested block comments and `E''`/`U&''`/`B''`/`X''` strings are supported.
+- Documented lexical limits: `a[x:y]` slices lex `:y` as a named parameter (use positional style there); psql `:'var'`/`:"var"` interpolation is rejected (`ERR_PARAM_SYNTAX`).
+- `:name` params compile to `$n` by first occurrence (repeats share one index). One style per query (`ERR_PARAM_MIXED`); positional gaps are errors (`ERR_PARAM_GAP`).
+- `SqlEntry` gains: `parameters` (names in `$n` order), `compiledText` (rewritten SQL), `positionalCount` (for `$n`-style queries), `cardinality` (from `-- @returns zero-or-one | exactly-one | many | none`), `line` (marker line).
+- INVARIANT: `text` and every hash always cover the ORIGINAL `:name` SQL. Compiled text lives only in `compiledText`/generated `statements`. `-- @returns` lines stay in the body. Therefore `check --generated` freshness is mode-independent (a dialect-mode mismatch between the flag and the file header does report `stale`).
+- `generate --dialect postgres` additionally emits:
+  `statements` (as const: `{ id, text /* compiled */, parameters /* literal tuple */, positionalCount?, cardinality?, hash /* of ORIGINAL text */ }` keyed by query ID), `SqlStatements`, and `SqlParamsOf<Id>` (mapped type: required keys, `unknown` values — presence typing, not schema typing).
+- Executor (`sql-loader/pg`, zero runtime deps — duck-typed client, works with pg `Pool`/`Client`/`PoolClient`):
+
+```ts
+import { createPgExecutor } from 'sql-loader/pg';
+const db = createPgExecutor(pool /* , { prepare: true } */);
+await db.execute(statements['users/findById'], { id: 1 });
+```
+
+  - Named statements take a params OBJECT (missing/unknown keys → TypeError with the required list); positional statements take an exact-length ARRAY; no-param statements take nothing.
+  - Return by cardinality: `many` (default) → `SqlRow[]`; `zero-or-one` → `SqlRow | null` (throws `ERR_CARDINALITY` on >1); `exactly-one` → `SqlRow` (throws on 0 or >1); `none` → affected-row count (number). `SqlRow = Record<string, unknown>`; narrow manually with `execute<MyRow>(...)`.
+  - `prepare: true` uses hash-derived prepared-statement names (<= 63 bytes). Off by default: PgBouncer transaction pooling (< 1.21) breaks named prepared statements.
+- Result COLUMN types are out of scope (no schema introspection) — pair with PgTyped/sqlc for schema-derived row types.
 
 ## Guarantees
 

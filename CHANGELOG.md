@@ -1,5 +1,37 @@
 # Changelog
 
+## 2.2.0-beta.0 - 2026-07-29
+
+Opt-in PostgreSQL parameter compilation, cardinality contracts, and a thin
+executor. Nothing changes without `dialect: 'postgres'` / `--dialect postgres`.
+
+### Added
+
+- Postgres-aware parameter lexer (`lexPostgresParams`, public): strings
+  (incl. `E''`, `U&''`, `B''`, `X''`), nested block comments, dollar quoting,
+  `::` casts, `:=`, jsonb `?` operators, `abc$1` identifiers. Documented
+  limits: `a[x:y]` slices, psql `:'var'` interpolation (rejected).
+- `dialect: 'postgres'` load option / CLI `--dialect postgres`: `:name` →
+  `$n` compilation on `SqlEntry.compiledText`, `parameters`,
+  `positionalCount`, `-- @returns` → `cardinality`, marker `line`.
+  Diagnostics: `ERR_PARAM_MIXED`, `ERR_PARAM_GAP`, `ERR_PARAM_SYNTAX`,
+  `ERR_ANNOTATION`, `WARN_UNKNOWN_ANNOTATION`.
+- Invariant: original `text` and all hashes are never touched by compilation;
+  `check --generated` also detects dialect-mode mismatches (reports `stale`).
+- `generate --dialect postgres` emits `statements` (compiled text + literal
+  parameter tuples), `SqlStatements`, and `SqlParamsOf<Id>` — missing or
+  misspelled parameters are compile errors. Works for `--format js` too.
+- `sql-loader/pg`: `createPgExecutor(client, { prepare? })` — parameter
+  binding with self-correcting TypeErrors, cardinality enforcement
+  (`ERR_CARDINALITY`), typed returns per `@returns`, hash-derived prepared
+  statement names (opt-in; PgBouncer caveat documented). Zero runtime deps;
+  duck-typed client verified against pg's `Pool`/`Client`/`PoolClient` types.
+
+### Notes
+
+- `DiagnosticCode`/`SqlLoaderErrorCode` unions widened — exhaustive switches
+  over them need new arms.
+
 ## 2.1.0-beta.0 - 2026-07-29
 
 `.sql` files are now directly importable — the "loader" in the name is literal.
