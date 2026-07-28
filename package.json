@@ -1,7 +1,7 @@
 {
   "name": "sql-loader",
   "version": "2.2.0-beta.0",
-  "description": "Load, validate, watch, and compile .sql files into safe, typed query catalogs for Node.js",
+  "description": "Import, validate, and compile .sql files into typed query catalogs — bundler plugins, a Node loader, CLI codegen, PostgreSQL parameter contracts, and zero dependencies",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -101,9 +101,16 @@
     "sql",
     "sql-loader",
     "sql-files",
+    "sql-import",
     "raw-sql",
     "query-loader",
     "query-catalog",
+    "named-parameters",
+    "postgres",
+    "postgresql",
+    "vite-plugin",
+    "rollup-plugin",
+    "esbuild-plugin",
     "database",
     "nodejs",
     "typescript",

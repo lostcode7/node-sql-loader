@@ -1,17 +1,19 @@
 # sql-loader
 
-> Load and compile `.sql` files into a safe, typed query catalog.
+> Import, validate, and compile `.sql` files into typed, executable query catalogs.
 
 [![npm next version](https://img.shields.io/npm/v/sql-loader/next?label=npm%20next)](https://www.npmjs.com/package/sql-loader?activeTab=versions)
 [![CI](https://github.com/lostcode7/node-sql-loader/actions/workflows/ci.yml/badge.svg)](https://github.com/lostcode7/node-sql-loader/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/sql-loader)](./LICENSE)
 
-Keep your SQL in `.sql` files — with syntax highlighting, reviews, and diffs — and access it from Node.js as a nested, read-only catalog. Optionally compile the whole directory into a single typed module with full autocomplete.
+Keep your SQL in `.sql` files — with syntax highlighting, reviews, and diffs — and make them first-class in Node.js: load a directory as a read-only catalog, `import` individual files as modules through a bundler plugin or the Node loader, compile everything into a single typed module with autocomplete, and (opt-in) get PostgreSQL parameter contracts enforced at compile time and run time.
 
 - **Zero runtime dependencies** · ESM + CJS · TypeScript types included · Node.js >= 22
-- **Deterministic**: same directory → same IDs, same order, same hashes, on every OS
+- **`.sql` files are modules**: Vite / Rollup / esbuild plugins and `node --import sql-loader/register`
+- **Typed codegen**: unknown query IDs — and, in Postgres mode, missing parameters — are compile errors
+- **Deterministic**: same directory → same IDs, same order, same hashes, byte-identical codegen, on every OS
 - **Safe**: frozen null-prototype trees, collision detection, actionable errors with stable codes
-- **No SQL execution, no parameter templating** — parameters always go to your DB driver, never into the SQL string
+- **Values never touch the SQL string** — parameters compile to driver placeholders (`$n`) and are passed as values; execution stays in your driver (or the thin opt-in `sql-loader/pg` adapter)
 
 ## Installation
 
@@ -162,15 +164,19 @@ const user = await db.execute(statements['users/findById'], { id });   // params
 
 `source` is a `file:` URL (module-relative — recommended) or a path string (relative strings resolve against `process.cwd()`).
 
-Options: `filter` (RegExp or predicate over the POSIX relative path), `onEmpty: 'error' | 'warn' | 'ignore'` (default `'error'`), `followSymlinks` (default `false`), `encoding` (default `'utf-8'`).
+Options: `filter` (RegExp or predicate over the POSIX relative path), `onEmpty: 'error' | 'warn' | 'ignore'` (default `'error'`), `followSymlinks` (default `false`), `encoding` (default `'utf-8'`), `dialect: 'postgres'` (opt-in parameter compilation — see above).
 
 Every entry carries a `sha256-` content hash; the catalog carries a directory hash over sorted `(id, hash)` pairs — stable across machines and useful for cache keys and staleness checks.
+
+Lower-level building blocks are public too: `compileSqlModule(text, path)` (the single-file `.sql` → ESM compiler behind the plugins — build your own bundler integration with it), `lexPostgresParams(text)` (the parameter lexer), and `createPgExecutor(client, options?)` from `sql-loader/pg`.
 
 ### Errors
 
 Fail-fast APIs throw `SqlLoaderError` with a stable `code` — branch on the code, and prefer `SqlLoaderError.isSqlLoaderError(err)` over `instanceof` (dual-package safe). Messages always include the file involved and a suggested fix. The `checkSql` APIs collect content diagnostics instead of stopping at the first one.
 
 `ERR_SOURCE_NOT_FOUND` · `ERR_INVALID_SOURCE` · `ERR_DUPLICATE_ID` · `ERR_NAME_COLLISION` · `ERR_EMPTY_SQL` · `ERR_INVALID_NAME` · `ERR_PRELUDE_CONTENT` · `ERR_WATCH_UNAVAILABLE`
+
+Postgres mode adds: `ERR_PARAM_MIXED` · `ERR_PARAM_GAP` · `ERR_PARAM_SYNTAX` · `ERR_ANNOTATION`, and the executor throws `ERR_CARDINALITY` when results violate a declared `@returns`. The full code → fix table lives in [`llms.txt`](./llms.txt).
 
 ### Dev-time reload
 
@@ -214,7 +220,7 @@ Also: the singleton cache is gone (each call is independent), only exact `.sql` 
 
 ## 한국어 요약
 
-`.sql` 파일 디렉터리를 안전한 읽기 전용 쿼리 카탈로그로 불러오는 라이브러리입니다.
+`.sql` 파일을 Node.js의 일급 시민으로 만들어주는 라이브러리입니다 — 디렉터리를 읽기 전용 쿼리 카탈로그로 로드하고, 번들러 플러그인/Node 로더로 `.sql` 파일을 직접 import하고, 타입 있는 모듈로 컴파일하며, PostgreSQL 파라미터 계약(opt-in)까지 검증합니다. 런타임 의존성 0개.
 
 ```js
 import { loadSql } from 'sql-loader';
