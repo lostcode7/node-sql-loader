@@ -1,0 +1,1 @@
+SELECT 'leaf' AS kind;

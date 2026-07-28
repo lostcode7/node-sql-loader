@@ -1,0 +1,35 @@
+name: Release
+
+# Publishes to npm via Trusted Publishing (OIDC) with provenance.
+# One-time setup on npmjs.com is required first:
+#   package settings → Trusted publishers → GitHub Actions →
+#   repository lostcode7/node-sql-loader, workflow release.yml.
+# Then: git tag v2.0.0-beta.1 && git push --tags
+# Prerelease tags (containing "-") publish to the "next" dist-tag; stable tags to "latest".
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # OIDC trusted publishing needs a recent npm.
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: Publish
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then TAG=next; else TAG=latest; fi
+          npm publish --provenance --access public --tag "$TAG"

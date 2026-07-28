@@ -30,6 +30,10 @@ build/Release
 node_modules
 jspm_packages
 
+# Build output
+dist
+*.tgz
+
 # Optional npm cache directory
 .npm
 

@@ -1,0 +1,1 @@
+﻿SELECT 'bom' AS marker;

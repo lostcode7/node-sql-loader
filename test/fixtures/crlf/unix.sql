@@ -1,0 +1,2 @@
+SELECT 'multi';
+SELECT 'line';

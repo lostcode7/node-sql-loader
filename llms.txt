@@ -1,0 +1,158 @@
+# sql-loader
+
+> Load and compile `.sql` files into a safe, typed query catalog. Node.js >= 22, zero runtime dependencies, ESM + CJS. This file is a complete machine-oriented reference for AI agents and tooling; the README covers the same ground for humans.
+
+## Import
+
+```js
+// ESM
+import { loadSql, loadSqlSync, loadSqlCatalog, loadSqlCatalogSync,
+         checkSql, checkSqlSync, watchSql, SqlLoaderError } from 'sql-loader';
+// CJS
+const { loadSqlSync, SqlLoaderError } = require('sql-loader');
+```
+
+The module has named exports only. It is NOT callable (v1 was: `require('sql-loader')(dir)` — that throws in v2).
+
+## API signatures
+
+```ts
+loadSql(source: string | URL, options?: LoadOptions): Promise<SqlTree>
+loadSqlSync(source: string | URL, options?: LoadOptions): SqlTree
+loadSqlCatalog(source: string | URL, options?: LoadOptions): Promise<CatalogResult>
+loadSqlCatalogSync(source: string | URL, options?: LoadOptions): CatalogResult
+checkSql(source: string | URL, options?: LoadOptions): Promise<CheckResult>      // never throws on content problems
+checkSqlSync(source: string | URL, options?: LoadOptions): CheckResult
+watchSql(source: string | URL, options?: WatchOptions): SqlWatcher               // dev-time reload
+
+interface SqlTree { readonly [key: string]: string | SqlTree }                   // null-prototype, deeply frozen
+interface SqlEntry { id: string; text: string; filePath: string; hash: string }  // hash = "sha256-<hex>" of text
+interface CatalogResult { tree: SqlTree; catalog: Map<string, SqlEntry>; entries: SqlEntry[]; hash: string }
+interface CheckResult { entries: SqlEntry[]; diagnostics: Diagnostic[]; hash: string }
+interface Diagnostic { severity: 'error' | 'warning'; code: string; message: string; file?: string; id?: string }
+
+interface LoadOptions {
+  filter?: RegExp | ((f: { relativePath: string; absolutePath: string }) => boolean); // include filter, POSIX relative path
+  onEmpty?: 'error' | 'warn' | 'ignore';   // default 'error'; applies to empty files AND an empty root
+  followSymlinks?: boolean;                // default false
+  encoding?: BufferEncoding;               // default 'utf-8'
+}
+interface WatchOptions extends LoadOptions {
+  debounceMs?: number;  // default 75
+  maxWaitMs?: number;   // default 500
+  poll?: number;        // ms; use instead of fs.watch on NFS/containers
+}
+```
+
+## Source resolution rules
+
+- `URL` (must be `file:`): module-relative — `new URL('./sql/', import.meta.url)`. Preferred.
+- Relative string: resolved against `process.cwd()` (v1 resolved against the calling file — common migration bug).
+- Absolute string: used as-is.
+
+## Query IDs and tree shape
+
+- Only files with the exact extension `.sql` (case-sensitive) load. `B.SQL`, `x.sql.txt` are ignored.
+- Key = basename minus the final `.sql` (dots preserved: `user.list.sql` → key `user.list`).
+- Query ID = `/`-joined path segments: `get/user.sql` → `get/user` → tree access `sql.get.user`.
+- Traversal is deterministic: binary UTF-16 code-unit ordering, never locale-dependent.
+- Tree nodes are `Object.create(null)`-based and deeply frozen; `__proto__.sql` etc. are safe data keys.
+- Content is normalized: UTF-8 BOM stripped, CRLF → LF (affects both text and hashes).
+- Empty subdirectories are omitted. Symlinks are skipped unless `followSymlinks: true`.
+
+## Named queries (multiple queries per file)
+
+```sql
+-- name: findById
+SELECT * FROM users WHERE id = :id;
+
+-- name: insertOne
+INSERT INTO users (name) VALUES (:name);
+```
+
+- Marker grammar (per line): `-- name: <identifier>`, lowercase `name` only; identifier must match `[A-Za-z_][A-Za-z0-9_]*`.
+- A file with >= 1 marker becomes a namespace: `users.sql` above yields IDs `users/findById`, `users/insertOne`.
+- Before the first marker only blank lines, `--` comments, and non-nested `/* */` comments are allowed (discarded).
+- Anything after the identifier on a marker line is an error (`ERR_INVALID_NAME`).
+- Known limitation: parsing is line-based, not a SQL lexer — a marker-shaped line inside a string literal or block comment is still treated as a marker.
+
+## Error codes → how to fix
+
+All errors are `SqlLoaderError` with a `code`. Branch on `code`, not the message. Use `SqlLoaderError.isSqlLoaderError(err)` instead of `instanceof` (dual-package safe).
+
+| code | meaning | fix |
+|---|---|---|
+| ERR_SOURCE_NOT_FOUND | directory missing | check path; relative strings are cwd-based; use `new URL('./sql/', import.meta.url)` for module-relative |
+| ERR_INVALID_SOURCE | not a directory / bad URL / empty string | pass a directory path string or `file:` URL |
+| ERR_DUPLICATE_ID | two sources produce the same query ID | rename one file or named query |
+| ERR_NAME_COLLISION | a query ID equals a directory/namespace path | rename the file or the directory |
+| ERR_EMPTY_SQL | empty file, empty named block, or no queries in root | add SQL, delete the file, or pass `onEmpty: 'warn' \| 'ignore'` (empty named blocks are always errors) |
+| ERR_INVALID_NAME | bad `-- name:` payload | use `-- name: someIdentifier`, nothing else on the line |
+| ERR_PRELUDE_CONTENT | SQL before the first `-- name:` marker | move it under a marker or remove it |
+| ERR_WATCH_UNAVAILABLE | fs.watch unsupported here | pass `{ poll: 1000 }` to watchSql |
+
+Warning diagnostic codes (from `check`): `WARN_BOM`, `WARN_CASE_INSENSITIVE_DUPLICATE`, `WARN_UNREADABLE`.
+
+## CLI contract
+
+```
+sql-loader generate <dir> --out <file> [--format ts|js]
+sql-loader check <dir> [--generated <file>] [--json]
+```
+
+Exit codes (stable API): `0` ok · `1` validation findings or stale generated file · `2` usage or I/O error.
+
+- `generate --format ts` (default): emits ONE self-contained `.ts` module — SQL strings embedded, no runtime FS access needed. Exports: `queries` (nested, `as const`), `SqlQueryId` (union type), `entries`, `sqlHash`, `getSql(id)`. Output is byte-deterministic; `--out` must end in `.ts`/`.mts`.
+- `generate --format js`: emits `.js` plus a sibling `.d.ts` (for projects that cannot run TypeScript). `--out` must end in `.js`/`.mjs`.
+- Generated header (line 2, parsed textually by `check`): `// sql-loader:generated v=1 hash=sha256-<hex> files=<n>`.
+- `check` validates and reports ALL problems (it does not stop at the first). With `--generated <file>` it compares the directory hash against the file header: `fresh` / `stale` / `unparseable`. With `--json` stdout is exactly one JSON object:
+
+```json
+{ "root": "...", "queries": 5, "hash": "sha256-...", "diagnostics": [Diagnostic...],
+  "generated": { "path": "...", "status": "fresh|stale|unparseable" } | null, "ok": true }
+```
+
+## Recipes
+
+Runtime loading (server startup):
+
+```js
+const sql = await loadSql(new URL('./sql/', import.meta.url));
+await db.query(sql.users.findById, [userId]);   // parameters go to the DB driver, never into the SQL string
+```
+
+Codegen workflow (bundlers, serverless, type-safe IDs):
+
+```
+npx sql-loader generate ./sql --out src/sql.generated.ts   # commit the output
+npx sql-loader check ./sql --generated src/sql.generated.ts --json   # in CI; exit 1 = regenerate
+```
+
+```ts
+import { queries, getSql } from './sql.generated.js';
+queries.users.findById;   // autocompleted; unknown IDs are type errors
+```
+
+Dev reload:
+
+```js
+const watcher = watchSql('./sql');
+watcher.on('error', console.error);            // REQUIRED: unhandled 'error' crashes the process
+watcher.on('change', ({ snapshot, added, removed, changed }) => { /* swap snapshot.tree */ });
+await watcher[Symbol.asyncDispose]();          // or watcher.close()
+```
+
+## Guarantees
+
+- Determinism: same directory content → same IDs, same order, same `sha256-` hashes, byte-identical generated output (per tool version), on every OS.
+- Directory hash = sha-256 over `id + "\n" + contentHash + "\n"` in sorted-ID order; independent of paths, mtimes, machines.
+- No SQL execution, no parameter interpolation, no DB drivers — pass parameter values to your driver separately.
+- Zero runtime dependencies.
+
+## v1 → v2 migration (breaking)
+
+1. The module is no longer a callable function: `require('sql-loader')('./sql')` → `loadSqlSync('./sql')` (or `await loadSql(...)`).
+2. Relative string paths now resolve against `process.cwd()`, not the calling file. Use `new URL('./sql/', import.meta.url)` for the old behavior.
+3. The singleton cache is gone — each call returns an independent result; reuse the returned object yourself.
+4. Only exact `.sql` extensions load (v1 loaded any filename containing "sql").
+5. Node >= 22 required.
