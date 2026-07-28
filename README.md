@@ -2,6 +2,10 @@
 
 > Load and compile `.sql` files into a safe, typed query catalog.
 
+[![npm next version](https://img.shields.io/npm/v/sql-loader/next?label=npm%20next)](https://www.npmjs.com/package/sql-loader?activeTab=versions)
+[![CI](https://github.com/lostcode7/node-sql-loader/actions/workflows/ci.yml/badge.svg)](https://github.com/lostcode7/node-sql-loader/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/sql-loader)](./LICENSE)
+
 Keep your SQL in `.sql` files — with syntax highlighting, reviews, and diffs — and access it from Node.js as a nested, read-only catalog. Optionally compile the whole directory into a single typed module with full autocomplete.
 
 - **Zero runtime dependencies** · ESM + CJS · TypeScript types included · Node.js >= 22
@@ -9,11 +13,16 @@ Keep your SQL in `.sql` files — with syntax highlighting, reviews, and diffs �
 - **Safe**: frozen null-prototype trees, collision detection, actionable errors with stable codes
 - **No SQL execution, no parameter templating** — parameters always go to your DB driver, never into the SQL string
 
+## Installation
+
+v2 is currently a prerelease and is published under the `next` dist-tag:
+
 ```
-npm install sql-loader
+npm install sql-loader@next
 ```
 
-> Migrating from v1? See [Migrating from v1](#migrating-from-v1) — v2 is a full rewrite with breaking changes.
+Installing `sql-loader` without a tag continues to install v1 until v2 is promoted to `latest`.
+Migrating from v1? See [Migrating from v1](#migrating-from-v1) — v2 is a full rewrite with breaking changes.
 
 ## Quick start
 
@@ -47,18 +56,18 @@ A file with `-- name:` markers holds several queries; the file becomes a namespa
 ```sql
 -- users.sql
 -- name: findById
-SELECT * FROM users WHERE id = :id;
+SELECT * FROM users WHERE id = $1;
 
 -- name: insertOne
-INSERT INTO users (name) VALUES (:name);
+INSERT INTO users (name) VALUES ($1);
 ```
 
 ```js
-sql.users.findById;   // "SELECT * FROM users WHERE id = :id;"
+sql.users.findById;   // "SELECT * FROM users WHERE id = $1;"
 sql.users.insertOne;
 ```
 
-Names must match `[A-Za-z_][A-Za-z0-9_]*`; only comments may precede the first marker. Parsing is line-based (documented limitation: a marker-shaped line inside a string literal is still treated as a marker).
+Names must match `[A-Za-z_][A-Za-z0-9_]*`; only comments may precede the first marker. The example uses PostgreSQL-style placeholders—use the placeholder syntax required by your database driver. Parsing is line-based (documented limitation: a marker-shaped line inside a string literal is still treated as a marker).
 
 ## Typed codegen — autocomplete for your SQL
 
@@ -103,7 +112,7 @@ Every entry carries a `sha256-` content hash; the catalog carries a directory ha
 
 ### Errors
 
-Everything throws `SqlLoaderError` with a stable `code` — branch on the code, and prefer `SqlLoaderError.isSqlLoaderError(err)` over `instanceof` (dual-package safe). Messages always include the file involved and a suggested fix.
+Fail-fast APIs throw `SqlLoaderError` with a stable `code` — branch on the code, and prefer `SqlLoaderError.isSqlLoaderError(err)` over `instanceof` (dual-package safe). Messages always include the file involved and a suggested fix. The `checkSql` APIs collect content diagnostics instead of stopping at the first one.
 
 `ERR_SOURCE_NOT_FOUND` · `ERR_INVALID_SOURCE` · `ERR_DUPLICATE_ID` · `ERR_NAME_COLLISION` · `ERR_EMPTY_SQL` · `ERR_INVALID_NAME` · `ERR_PRELUDE_CONTENT` · `ERR_WATCH_UNAVAILABLE`
 
@@ -114,6 +123,9 @@ import { watchSql } from 'sql-loader';
 
 const watcher = watchSql(new URL('./sql/', import.meta.url));
 watcher.on('error', console.error); // required — unhandled 'error' events crash the process
+watcher.on('ready', (snapshot) => {
+  currentSql = snapshot.tree;
+});
 watcher.on('change', ({ snapshot, added, removed, changed }) => {
   currentSql = snapshot.tree;
 });

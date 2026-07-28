@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.0.0
+## 2.0.0-beta.0 - 2026-07-29
 
 Full rewrite. Positioning: “Load and compile `.sql` files into a safe, typed query catalog.”
 

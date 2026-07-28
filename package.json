@@ -1,7 +1,7 @@
 {
   "name": "sql-loader",
   "version": "2.0.0-beta.0",
-  "description": "Load and compile .sql files into a safe, typed query catalog",
+  "description": "Load, validate, watch, and compile .sql files into safe, typed query catalogs for Node.js",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -26,6 +26,8 @@
   },
   "files": [
     "dist",
+    "docs",
+    "CHANGELOG.md",
     "llms.txt"
   ],
   "sideEffects": false,
@@ -36,6 +38,9 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node --test \"test/**/*.test.mjs\" \"test/**/*.test.cjs\"",
     "test:coverage": "npm run build && node --test --experimental-test-coverage \"test/**/*.test.mjs\" \"test/**/*.test.cjs\"",
+    "validate:package": "publint && attw --pack",
+    "check": "npm run lint && npm run typecheck && npm test && npm run validate:package",
+    "prepublishOnly": "npm run check",
     "prepack": "npm run build"
   },
   "repository": {
@@ -45,19 +50,31 @@
   "keywords": [
     "sql",
     "sql-loader",
-    "sql file",
-    "query catalog",
-    "load sql",
-    "sql manager",
+    "sql-files",
+    "raw-sql",
+    "query-loader",
+    "query-catalog",
+    "database",
+    "nodejs",
     "typescript",
-    "codegen"
+    "codegen",
+    "cli",
+    "esm",
+    "commonjs",
+    "serverless"
   ],
-  "author": "lostcode7",
+  "author": {
+    "name": "Dongju Jung",
+    "url": "https://github.com/lostcode7"
+  },
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/lostcode7/node-sql-loader/issues"
   },
   "homepage": "https://github.com/lostcode7/node-sql-loader#readme",
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@biomejs/biome": "^2.5.6",
