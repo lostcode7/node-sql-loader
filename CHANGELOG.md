@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.2.0-beta.0 - 2026-07-29
+## 2.2.0 - 2026-07-29
 
 Opt-in PostgreSQL parameter compilation, cardinality contracts, and a thin
 executor. Nothing changes without `dialect: 'postgres'` / `--dialect postgres`.
@@ -32,7 +32,9 @@ executor. Nothing changes without `dialect: 'postgres'` / `--dialect postgres`.
 - `DiagnosticCode`/`SqlLoaderErrorCode` unions widened — exhaustive switches
   over them need new arms.
 
-## 2.1.0-beta.0 - 2026-07-29
+## 2.1.0 - 2026-07-29
+
+Released together with 2.2.0 (never published separately).
 
 `.sql` files are now directly importable — the "loader" in the name is literal.
 
@@ -51,7 +53,9 @@ executor. Nothing changes without `dialect: 'postgres'` / `--dialect postgres`.
   compiler behind all plugins, usable for custom integrations.
 - In Vite, `?raw`/`?url`/`?inline` `.sql` imports keep their asset semantics.
 
-## 2.0.0-beta.0 - 2026-07-29
+## 2.0.0 - 2026-07-29
+
+Released together with 2.2.0 (never published separately).
 
 Full rewrite. Positioning: “Load and compile `.sql` files into a safe, typed query catalog.”
 

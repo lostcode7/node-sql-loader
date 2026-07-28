@@ -2,7 +2,7 @@
 
 > Import, validate, and compile `.sql` files into typed, executable query catalogs.
 
-[![npm next version](https://img.shields.io/npm/v/sql-loader/next?label=npm%20next)](https://www.npmjs.com/package/sql-loader?activeTab=versions)
+[![npm version](https://img.shields.io/npm/v/sql-loader)](https://www.npmjs.com/package/sql-loader)
 [![CI](https://github.com/lostcode7/node-sql-loader/actions/workflows/ci.yml/badge.svg)](https://github.com/lostcode7/node-sql-loader/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/sql-loader)](./LICENSE)
 
@@ -17,13 +17,10 @@ Keep your SQL in `.sql` files — with syntax highlighting, reviews, and diffs �
 
 ## Installation
 
-v2 is currently a prerelease and is published under the `next` dist-tag:
-
 ```
-npm install sql-loader@next
+npm install sql-loader
 ```
 
-Installing `sql-loader` without a tag continues to install v1 until v2 is promoted to `latest`.
 Migrating from v1? See [Migrating from v1](#migrating-from-v1) — v2 is a full rewrite with breaking changes.
 
 ## Quick start

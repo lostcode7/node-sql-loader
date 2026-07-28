@@ -1,6 +1,6 @@
 {
   "name": "sql-loader",
-  "version": "2.2.0-beta.0",
+  "version": "2.2.0",
   "description": "Import, validate, and compile .sql files into typed query catalogs — bundler plugins, a Node loader, CLI codegen, PostgreSQL parameter contracts, and zero dependencies",
   "type": "module",
   "engines": {
