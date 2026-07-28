@@ -1,6 +1,6 @@
 {
   "name": "sql-loader",
-  "version": "2.0.0-beta.0",
+  "version": "2.1.0-beta.0",
   "description": "Load, validate, watch, and compile .sql files into safe, typed query catalogs for Node.js",
   "type": "module",
   "engines": {
@@ -17,6 +17,45 @@
         "default": "./dist/index.cjs"
       }
     },
+    "./vite": {
+      "import": {
+        "types": "./dist/vite.d.ts",
+        "default": "./dist/vite.js"
+      },
+      "require": {
+        "types": "./dist/vite.d.cts",
+        "default": "./dist/vite.cjs"
+      }
+    },
+    "./rollup": {
+      "import": {
+        "types": "./dist/rollup.d.ts",
+        "default": "./dist/rollup.js"
+      },
+      "require": {
+        "types": "./dist/rollup.d.cts",
+        "default": "./dist/rollup.cjs"
+      }
+    },
+    "./esbuild": {
+      "import": {
+        "types": "./dist/esbuild.d.ts",
+        "default": "./dist/esbuild.js"
+      },
+      "require": {
+        "types": "./dist/esbuild.d.cts",
+        "default": "./dist/esbuild.cjs"
+      }
+    },
+    "./register": {
+      "import": {
+        "types": "./dist/register.d.ts",
+        "default": "./dist/register.js"
+      }
+    },
+    "./types": {
+      "types": "./types.d.ts"
+    },
     "./package.json": "./package.json"
   },
   "main": "./dist/index.cjs",
@@ -27,6 +66,7 @@
   "files": [
     "dist",
     "docs",
+    "types.d.ts",
     "CHANGELOG.md",
     "llms.txt"
   ],
@@ -79,7 +119,9 @@
     "@arethetypeswrong/cli": "^0.18.5",
     "@biomejs/biome": "^2.5.6",
     "@types/node": "^26.1.2",
+    "esbuild": "^0.28.1",
     "publint": "^0.3.22",
+    "rollup": "^4.62.3",
     "tsdown": "^0.21.10",
     "typescript": "^5.9.3"
   }

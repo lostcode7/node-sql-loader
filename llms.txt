@@ -112,6 +112,31 @@ Exit codes (stable API): `0` ok · `1` validation findings or stale generated fi
   "generated": { "path": "...", "status": "fresh|stale|unparseable" } | null, "ok": true }
 ```
 
+## Direct `.sql` imports (v2.1+)
+
+Export subpaths (all zero-runtime-dependency; bundlers/pg never imported at runtime):
+
+| subpath | purpose | module system |
+|---|---|---|
+| `sql-loader/vite` | Vite plugin: `plugins: [sqlLoader()]` | ESM + CJS |
+| `sql-loader/rollup` | Rollup plugin (same transform as vite) | ESM + CJS |
+| `sql-loader/esbuild` | esbuild plugin: `plugins: [sqlLoader()]` | ESM + CJS |
+| `sql-loader/register` | Node loader: `node --import sql-loader/register app.mjs` | ESM only |
+| `sql-loader/types` | ambient `declare module '*.sql'` for tsconfig `types` | types only |
+
+Module shape contract (identical across plugins and the Node loader; text normalized like `loadSql`):
+- File WITHOUT `-- name:` markers → `export default "<sql string>"` (only export).
+- File WITH markers → one named export per query (string) + `default` = frozen object of all queries.
+- Reserved-word query names are legal: alias on import — `import { delete as removeUser } from './users.sql'`.
+- A query named exactly `default` is an error (collides with the default export).
+- `compileSqlModule(rawText, filePath)` (public API) is the underlying single-file compiler — use it to build integrations for other bundlers.
+
+Limitations (stable, by design):
+- Node loader: ESM `import`/`import()` only. CJS `require('./x.sql')` is NOT supported — use a bundler plugin.
+- Vite `?raw`/`?url`/`?inline` queries are left to Vite's asset pipeline (`?raw` still gives the raw file string).
+- HMR: `.sql` edits propagate to importers (usually full reload); modules do not hot-swap in place.
+- The `*.sql` ambient type (via `sql-loader/types`) types the default export as `string & { readonly [k: string]: string }` — an approximation. Named imports type-error; use `sql-loader generate` for precise types.
+
 ## Recipes
 
 Runtime loading (server startup):

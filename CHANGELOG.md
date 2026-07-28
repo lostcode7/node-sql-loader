@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.1.0-beta.0 - 2026-07-29
+
+`.sql` files are now directly importable — the "loader" in the name is literal.
+
+### Added
+
+- Bundler plugins as export subpaths (zero runtime dependencies; dual ESM/CJS):
+  `sql-loader/vite`, `sql-loader/rollup`, `sql-loader/esbuild`.
+  Plain files compile to a default string export; `-- name:` files to named
+  exports plus a frozen default object. Reserved-word query names work via
+  alias exports (`import { delete as removeUser } ...`).
+- Node ESM loader: `node --import sql-loader/register app.mjs` (ESM-only).
+  CJS `require('./x.sql')` is intentionally unsupported (Node's require(esm)
+  translator crashes with customization-hook-provided modules on current 22.x).
+- `sql-loader/types`: opt-in ambient `declare module '*.sql'` declarations.
+- `compileSqlModule(rawText, filePath)` public API — the shared single-file
+  compiler behind all plugins, usable for custom integrations.
+- In Vite, `?raw`/`?url`/`?inline` `.sql` imports keep their asset semantics.
+
 ## 2.0.0-beta.0 - 2026-07-29
 
 Full rewrite. Positioning: “Load and compile `.sql` files into a safe, typed query catalog.”

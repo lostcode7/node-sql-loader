@@ -1,4 +1,5 @@
 export type { Diagnostic, DiagnosticCode } from './build';
+export { type CompiledSqlModule, compileSqlModule } from './emit';
 export { SqlLoaderError, type SqlLoaderErrorCode } from './errors';
 export {
   type CheckResult,

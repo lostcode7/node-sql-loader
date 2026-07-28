@@ -95,6 +95,31 @@ npx sql-loader check ./sql --generated src/sql.generated.ts
 
 Exit codes: `0` ok · `1` findings or stale generated file · `2` usage/I/O error. Add `--json` for machine-readable diagnostics. Projects that can't compile TypeScript can use `--format js` (emits `.js` + `.d.ts`).
 
+## Import `.sql` files directly
+
+`.sql` files can be modules — via a bundler plugin or a Node loader:
+
+```js
+import findUser from './queries/find-user.sql';          // plain file → the SQL string
+import users, { findById } from './queries/users.sql';   // -- name: file → named exports
+                                                         // + frozen object default
+```
+
+| Subpath | Use with | Module system |
+|---|---|---|
+| `sql-loader/vite` | `vite.config` → `plugins: [sqlLoader()]` | ESM + CJS |
+| `sql-loader/rollup` | `rollup.config` → `plugins: [sqlLoader()]` | ESM + CJS |
+| `sql-loader/esbuild` | `build({ plugins: [sqlLoader()] })` | ESM + CJS |
+| `sql-loader/register` | `node --import sql-loader/register app.mjs` | ESM only |
+| `sql-loader/types` | tsconfig `"types": ["sql-loader/types"]` | ambient `*.sql` types |
+
+Notes:
+
+- Query names that are JS reserved words work — alias them on import: `import { delete as removeUser } from './users.sql'`.
+- The Node loader supports ESM `import` only; CJS `require('./x.sql')` is not supported (use a bundler plugin there).
+- In Vite, `?raw`/`?url`/`?inline` imports keep their normal asset semantics; editing a `.sql` file triggers a reload (the module intentionally doesn't hot-swap in place).
+- The ambient `*.sql` type is an approximation (default export typed as a string with string properties). For precise, per-query types use `sql-loader generate`.
+
 ## API
 
 | Function | Returns |
@@ -169,6 +194,7 @@ await db.query(sql.users.findById, [userId]);
 - `npx sql-loader generate ./sql --out src/sql.generated.ts` — SQL을 임베드한 타입 모듈 생성 (자동완성 + 오타는 컴파일 에러)
 - `npx sql-loader check ./sql --generated src/sql.generated.ts` — CI에서 검증·재생성 필요 감지 (`--json` 지원)
 - `watchSql(dir)` — 개발 중 `.sql` 변경 자동 반영
+- **`.sql` 직접 import** — `sql-loader/vite`·`/rollup`·`/esbuild` 플러그인 또는 `node --import sql-loader/register`로 `.sql` 파일을 모듈처럼 import (`-- name:` 파일은 named export)
 - **v1에서 오신 분**: 모듈이 더 이상 함수가 아닙니다(`loadSqlSync(dir)` 사용). 상대경로는 이제 호출 파일이 아닌 `process.cwd()` 기준입니다 — 모듈 기준 경로는 `new URL('./sql/', import.meta.url)`을 쓰세요. 자세한 내용: [docs/MIGRATION.md](./docs/MIGRATION.md)
 
 ## License

@@ -6,6 +6,21 @@ export interface ParsedQuery {
   text: string;
 }
 
+/**
+ * Canonical text normalization applied to every `.sql` source regardless of
+ * entry point (directory scan, bundler plugin, ESM loader): strip a UTF-8 BOM
+ * and normalize CRLF to LF so texts and hashes agree across OSes.
+ */
+export function normalizeSqlText(raw: string): { text: string; hadBom: boolean } {
+  let text = raw;
+  let hadBom = false;
+  if (text.charCodeAt(0) === 0xfeff) {
+    hadBom = true;
+    text = text.slice(1);
+  }
+  return { text: text.replaceAll('\r\n', '\n'), hadBom };
+}
+
 // Line-based grammar, evaluated per line. Lowercase `name` only; `-- NAME:` is
 // an ordinary comment. This is intentionally NOT a SQL lexer: a marker-shaped
 // line inside a string literal or block comment is still treated as a marker

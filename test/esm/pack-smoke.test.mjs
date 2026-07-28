@@ -80,6 +80,60 @@ test('npm pack → install into a temp project → ESM, CJS, and CLI all work', 
 
     const shebang = fs.readFileSync(cliPath, 'utf8').slice(0, 2);
     assert.equal(shebang, '#!', 'CLI entry must start with a shebang');
+
+    // v2.1 subpaths: bundler plugins resolve via ESM and CJS.
+    fs.writeFileSync(
+      path.join(project, 'subpaths-check.mjs'),
+      [
+        "import { sqlLoader as vite } from 'sql-loader/vite';",
+        "import { sqlLoader as rollup } from 'sql-loader/rollup';",
+        "import { sqlLoader as esbuild } from 'sql-loader/esbuild';",
+        "if (typeof vite !== 'function' || typeof rollup !== 'function' || typeof esbuild !== 'function')",
+        "  throw new Error('bad plugin exports');",
+        "if (vite().enforce !== 'pre') throw new Error('vite plugin missing enforce');",
+        "console.log('subpaths-ok');",
+      ].join('\n'),
+    );
+    const subpaths = spawnSync(process.execPath, ['subpaths-check.mjs'], {
+      cwd: project,
+      encoding: 'utf8',
+    });
+    assert.equal(subpaths.status, 0, subpaths.stderr);
+    assert.match(subpaths.stdout, /subpaths-ok/);
+
+    fs.writeFileSync(
+      path.join(project, 'subpaths-check.cjs'),
+      [
+        "const { sqlLoader } = require('sql-loader/rollup');",
+        "if (typeof sqlLoader !== 'function') throw new Error('bad cjs plugin export');",
+        "console.log('subpaths-cjs-ok');",
+      ].join('\n'),
+    );
+    const subpathsCjs = spawnSync(process.execPath, ['subpaths-check.cjs'], {
+      cwd: project,
+      encoding: 'utf8',
+    });
+    assert.equal(subpathsCjs.status, 0, subpathsCjs.stderr);
+
+    // v2.1: --import sql-loader/register from the installed package.
+    fs.writeFileSync(
+      path.join(project, 'register-check.mjs'),
+      [
+        "import query from './sql/hello.sql';",
+        "if (!query.includes('SELECT')) throw new Error('bad .sql import');",
+        "console.log('register-ok');",
+      ].join('\n'),
+    );
+    const registered = spawnSync(
+      process.execPath,
+      ['--import', 'sql-loader/register', 'register-check.mjs'],
+      { cwd: project, encoding: 'utf8' },
+    );
+    assert.equal(registered.status, 0, registered.stderr);
+    assert.match(registered.stdout, /register-ok/);
+
+    // v2.1: wildcard types ship in the tarball.
+    assert.ok(fs.existsSync(path.join(project, 'node_modules', 'sql-loader', 'types.d.ts')));
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

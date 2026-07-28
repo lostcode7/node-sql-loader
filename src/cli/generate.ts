@@ -2,12 +2,11 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
+import { emitKey, IDENTIFIER_RE } from '../emit';
 import type { SqlEntry } from '../index';
 import { loadSqlCatalogSync, SqlLoaderError } from '../index';
 
 const pkg = createRequire(import.meta.url)('../../package.json') as { version: string };
-
-const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
 const USAGE = 'Usage: sql-loader generate <dir> --out <file> [--format ts|js]';
 
@@ -30,13 +29,6 @@ function buildNestedMap(entries: readonly SqlEntry[]): TreeNode {
     node.set(segments[segments.length - 1] ?? '', entry.text);
   }
   return root;
-}
-
-// `__proto__` must be emitted as a computed key: in an object literal even a
-// quoted "__proto__" key triggers prototype-setter semantics.
-function emitKey(key: string): string {
-  if (key === '__proto__') return '["__proto__"]';
-  return IDENTIFIER_RE.test(key) ? key : JSON.stringify(key);
 }
 
 function emitValueNode(node: TreeNode, indent: string): string {

@@ -1,6 +1,7 @@
-import fs from 'node:fs';
+﻿import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import { normalizeSqlText } from './parse';
 import { notADirectoryError, type ResolvedSource, sourceNotFoundError } from './resolve';
 import type { FilterInput, LoadOptions, OnEmpty } from './types';
 
@@ -50,16 +51,6 @@ export function resolveOptions(options: LoadOptions = {}): ResolvedOptions {
 /** Deterministic, locale-independent name ordering (UTF-16 code units). */
 export function compareNames(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
-}
-
-function normalizeRead(raw: string): { text: string; hadBom: boolean } {
-  let text = raw;
-  let hadBom = false;
-  if (text.charCodeAt(0) === 0xfeff) {
-    hadBom = true;
-    text = text.slice(1);
-  }
-  return { text: text.replaceAll('\r\n', '\n'), hadBom };
 }
 
 function includeFile(
@@ -133,7 +124,7 @@ export function scanSync(
       if (!isFile || !includeFile(dirent.name, rel, abs, options)) continue;
       try {
         const raw = fs.readFileSync(abs, options.encoding);
-        const { text, hadBom } = normalizeRead(raw);
+        const { text, hadBom } = normalizeSqlText(raw);
         files.push({ absolutePath: abs, relativePath: rel, segments, text, hadBom });
       } catch (cause) {
         if (!collectProblems) throw cause;
@@ -197,7 +188,7 @@ export async function scan(
       if (!isFile || !includeFile(dirent.name, rel, abs, options)) continue;
       try {
         const raw = await fsp.readFile(abs, options.encoding);
-        const { text, hadBom } = normalizeRead(raw);
+        const { text, hadBom } = normalizeSqlText(raw);
         files.push({ absolutePath: abs, relativePath: rel, segments, text, hadBom });
       } catch (cause) {
         if (!collectProblems) throw cause;
